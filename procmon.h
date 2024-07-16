@@ -172,4 +172,11 @@ void *thread_net(void *arg);
  */
 void *thread_core(void *arg);
 
+/**
+ * @description: Network traffic monitoring thread using nftables
+ * @param {*}
+ * @return {*}
+ */
+void *thread_nft(void *arg);
+
 #endif

@@ -13,6 +13,8 @@
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sqlite3.h>
+#include <fcntl.h>
+#include <json-c/json.h>
 
 #include "procmon.h"
 
@@ -46,6 +48,20 @@ void init_db() {
                       "d_speed REAL, "
                       "u_speed REAL);";
     rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", err_msg);
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
+        exit(1);
+    }
+
+     const char *sql2 = "CREATE TABLE IF NOT EXISTS nft_traffic("
+                       "timestamp TEXT, "
+                       "ip_address TEXT, "
+                       "mac_address TEXT, "
+                       "packets INTEGER, "
+                       "bytes INTEGER);";
+    rc = sqlite3_exec(db, sql2, 0, 0, &err_msg);
     if (rc != SQLITE_OK) {
         fprintf(stderr, "SQL error: %s\n", err_msg);
         sqlite3_free(err_msg);
@@ -86,6 +102,26 @@ void insert_db(double cpu_usage, double mem_usage, NET_INTERFACE *net) {
     }
 }
 
+void insert_nft_traffic(const char* ip, const char* mac, int packets, int bytes) {
+    char *err_msg = 0;
+    char sql[512];
+
+    time_t t = time(NULL);
+    struct tm tm = *localtime(&t);
+
+    snprintf(sql, sizeof(sql),
+             "INSERT INTO nft_traffic (timestamp, ip_address, mac_address, packets, bytes) VALUES "
+             "('%04d-%02d-%02d %02d:%02d:%02d', '%s', '%s', %d, %d);",
+             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec,
+             ip, mac, packets, bytes);
+
+    int rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "SQL error: %s\n", err_msg);
+        sqlite3_free(err_msg);
+    }
+}
+
 void *thread_net(void *arg) {
     printf("%s\n", __FUNCTION__);
 
@@ -112,6 +148,80 @@ void *thread_core(void *arg) {
         get_cpu_usage(&(host_core.cpu_used));
         printf("[cpu_used]:%6.2f%%\n", host_core.cpu_used);
         sleep(10);
+    }
+}
+
+typedef struct {
+    int sockfd;
+    int id;
+} THREAD;
+
+
+
+void *thread_nft(void *arg) {
+    printf("%s\n", __FUNCTION__);
+    while (1) {
+        char command[256];
+        FILE *fp;
+        char buffer[4096];
+
+        // Execute nft -j list set ip xray mac_set and capture output
+        sprintf(command, "nft -j list set ip xray mac_set");
+        fp = popen(command, "r");
+        if (fp == NULL) {
+            perror("Failed to execute command");
+            exit(EXIT_FAILURE);
+        }
+
+        // Read JSON data from command output
+        if (fgets(buffer, sizeof(buffer), fp) != NULL) {
+            // Parse JSON using json-c library
+            struct json_object *jobj = json_tokener_parse(buffer);
+            if (jobj != NULL) {
+                // Process JSON object to extract IP traffic info
+                struct json_object *nftables_array = NULL;
+                struct json_object *set_obj = NULL;
+                struct json_object *elem_array = NULL;
+
+                if (json_object_object_get_ex(jobj, "nftables", &nftables_array) &&
+                    json_object_is_type(nftables_array, json_type_array)) {
+                    for (size_t i = 0; i < json_object_array_length(nftables_array); ++i) {
+                        struct json_object *nft_item = json_object_array_get_idx(nftables_array, i);
+                        if (json_object_object_get_ex(nft_item, "set", &set_obj)) {
+                            if (json_object_object_get_ex(set_obj, "elem", &elem_array) &&
+                                json_object_is_type(elem_array, json_type_array)) {
+                                for (size_t j = 0; j < json_object_array_length(elem_array); ++j) {
+                                    struct json_object *elem_item = json_object_array_get_idx(elem_array, j);
+                                    struct json_object *val_obj = NULL;
+                                    struct json_object *counter_obj = NULL;
+                                    if (json_object_object_get_ex(elem_item, "elem", &val_obj) &&
+                                        json_object_object_get_ex(val_obj, "val", &val_obj) &&
+                                        json_object_object_get_ex(val_obj, "concat", &val_obj) &&
+                                        json_object_object_get_ex(elem_item, "counter", &counter_obj)) {
+
+                                        const char *ip = json_object_get_string(json_object_array_get_idx(val_obj, 0));
+                                        const char *mac = json_object_get_string(json_object_array_get_idx(val_obj, 1));
+                                        int packets = json_object_get_int(json_object_object_get(counter_obj, "packets"));
+                                        int bytes = json_object_get_int(json_object_object_get(counter_obj, "bytes"));
+
+                                        insert_nft_traffic(ip, mac, packets, bytes);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                json_object_put(jobj); // Free JSON object
+            }
+        }
+        pclose(fp);
+
+        // Flush set ip xray mac_set
+        sprintf(command, "nft flush set ip xray mac_set");
+        system(command);
+
+        // Wait for one minute before repeating
+        sleep(60);
     }
 }
 
@@ -396,12 +506,14 @@ int main() {
     printf("net_interface nums: %d\n", nums);
 
     show_netinterfaces(p_interface, 0);
-    pthread_t thread_net_id, thread_core_id;
+    pthread_t thread_net_id, thread_core_id, thread_nft_id;
     pthread_create(&thread_net_id, NULL, (void *)thread_net, NULL);
     pthread_create(&thread_core_id, NULL, (void *)thread_core, NULL);
+    pthread_create(&thread_nft_id, NULL, (void *)thread_nft, NULL);
 
     pthread_join(thread_net_id, NULL);
     pthread_join(thread_core_id, NULL);
+    pthread_join(thread_nft_id, NULL);
 
     sqlite3_close(db);
     return 0;
