@@ -17,6 +17,7 @@
 #include <json-c/json.h>
 
 #include "procmon.h"
+#include "io.h"
 
 sqlite3 *db; // SQLite3 database connection
 FILE *net_dev_file = NULL; // /proc/net/dev file
@@ -506,15 +507,18 @@ int main() {
     printf("net_interface nums: %d\n", nums);
 
     show_netinterfaces(p_interface, 0);
-    pthread_t thread_net_id, thread_core_id, thread_nft_id;
+    pthread_t thread_net_id, thread_core_id, thread_nft_id, thread_io_id;
     pthread_create(&thread_net_id, NULL, (void *)thread_net, NULL);
     pthread_create(&thread_core_id, NULL, (void *)thread_core, NULL);
     pthread_create(&thread_nft_id, NULL, (void *)thread_nft, NULL);
+    pthread_create(&thread_io_id, NULL, (void *)send_db_to_server, NULL);
+
 
     pthread_join(thread_net_id, NULL);
     pthread_join(thread_core_id, NULL);
     pthread_join(thread_nft_id, NULL);
-
+    pthread_join(thread_io_id, NULL);
+    
     sqlite3_close(db);
     return 0;
 }
