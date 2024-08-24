@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(procmon C)
+project(procmon CXX)
 
 # Find the required packages
 find_package(Protobuf REQUIRED)
@@ -14,8 +14,8 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/grpc)
 
 # Add the source files
 set(SOURCES
-    procmon.c
-    io.c
+    procmon.cpp
+    io.cpp
     grpc/procmon.grpc.pb.cc
     grpc/procmon.pb.cc
 )
@@ -30,6 +30,9 @@ target_link_libraries(procmon
     pthread
     sqlite3
 )
+
+# C++ standard
+set_property(TARGET procmon PROPERTY CXX_STANDARD 17)
 
 # Installation rules
 install(TARGETS procmon DESTINATION bin)
