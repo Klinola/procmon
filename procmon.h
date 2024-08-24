@@ -5,6 +5,8 @@
 #ifndef _PROCMON_H
 #define _PROCMON_H
 
+#include <sys/time.h>
+
 #define BUFFSIZE 512
 #define WAIT_SECOND 1
 #define MB 1024

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package procmon;
+
+service ProcmonService {
+    rpc GetSystemStatus (StatusRequest) returns (StatusResponse);
+    rpc GetNftTraffic (NftTrafficRequest) returns (NftTrafficResponse);
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+    double cpu_usage = 1;
+    double mem_usage = 2;
+    double total_memory = 3;
+    double free_memory = 4;
+    string net_interface = 5;
+    int64 rx_bytes = 6;
+    int64 tx_bytes = 7;
+    double d_speed = 8;
+    double u_speed = 9;
+}
+
+message NftTrafficRequest {}
+
+message NftTrafficResponse {
+    repeated NftTraffic nft_traffic = 1;
+}
+
+message NftTraffic {
+    string timestamp = 1;
+    string ip_address = 2;
+    string mac_address = 3;
+    int32 packets = 4;
+    int32 bytes = 5;
+}
