@@ -1,8 +1,8 @@
 #ifndef _IO_H
 #define _IO_H
 
-#include "grpc/procmon.grpc.pb.h"
-
+#include "proto/procmon.grpc.pb.h"
+extern sqlite3 *db; 
 /**
  * @description: Open the SQLite3 database
  * @param {*}

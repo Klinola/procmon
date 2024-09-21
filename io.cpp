@@ -5,10 +5,8 @@
 #include <arpa/inet.h>
 #include <sqlite3.h>
 #include "io.h"
-#include "grpc/procmon.grpc.pb.h"
+#include "proto/procmon.grpc.pb.h"
 
-// SQLite3 database connection
-sqlite3 *db;
 
 // Function to open database
 int open_db() {

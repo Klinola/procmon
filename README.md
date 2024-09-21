@@ -8,6 +8,7 @@ This program monitors system resources such as CPU usage, memory usage, and netw
 - OpenWrt device with necessary development tools installed.
 - SQLite3 library (`libsqlite3-dev`).
 - gRPC and Protocol Buffers libraries.
+- Abseil Google
 - C++ compiler (e.g., GCC or Clang).
 
 ## Features
@@ -22,10 +23,19 @@ This program monitors system resources such as CPU usage, memory usage, and netw
 1. **Install Dependencies**:
    Ensure that all necessary libraries are installed, including SQLite3, gRPC, and Protocol Buffers.
 
+   For gRPC installation, check [here](https://grpc.io/docs/languages/cpp/quickstart/).
+
    ```bash
-   sudo apt-get install libsqlite3-dev
-   sudo apt-get install grpc
-   sudo apt-get install protobuf-compiler
+   sudo apt-get install libsqlite3-dev libjson-c-dev libssl-dev grpc protobuf-compiler libre2-dev
+   ```
+
+   ```bash
+   git clone https://github.com/abseil/abseil-cpp.git
+   cd abseil-cpp
+   mkdir build && cd build
+   cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+   make -j
+   sudo make install
    ```
 
 2. **Clone the Repository**:

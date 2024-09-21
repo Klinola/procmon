@@ -14,12 +14,17 @@
 #include <sys/time.h>
 #include <sqlite3.h>
 #include <grpcpp/grpcpp.h>
+#include <json-c/json.h>
+#include <thread>
+
 
 #include "procmon.h"
 #include "io.h"
-#include "grpc/procmon.grpc.pb.h"
+#include "proto/procmon.grpc.pb.h"
 
-sqlite3 *db; // SQLite3 database connection
+using namespace grpc;
+
+sqlite3 *db = NULL; // SQLite3 database connection
 FILE *net_dev_file = NULL; // /proc/net/dev file
 NET_INTERFACE *p_interface = NULL; // Local network interface information structure
 HOST_STATE host_core; // Host state information structure
@@ -548,9 +553,9 @@ int main() {
     show_netinterfaces(p_interface, 0);
 
     pthread_t thread_net_id, thread_core_id, thread_nft_id;
-    pthread_create(&thread_net_id, NULL, (void *)thread_net, NULL);
-    pthread_create(&thread_core_id, NULL, (void *)thread_core, NULL);
-    pthread_create(&thread_nft_id, NULL, (void *)thread_nft, NULL);
+    pthread_create(&thread_net_id, NULL, thread_net, NULL);
+    pthread_create(&thread_core_id, NULL, thread_core, NULL);
+    pthread_create(&thread_nft_id, NULL, thread_nft, NULL);
 
     // 启动 gRPC 服务线程
     std::thread grpc_thread(RunServer);
